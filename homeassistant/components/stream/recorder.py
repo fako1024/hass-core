@@ -47,6 +47,9 @@ class RecorderOutput(StreamOutput):
         super().__init__(hass, idle_timer, stream_settings, dynamic_stream_settings)
         self.video_path: str
 
+        from asyncio import Event
+        self._recording_stopped = Event()
+
     @property
     def name(self) -> str:
         """Return provider name."""
@@ -60,6 +63,10 @@ class RecorderOutput(StreamOutput):
         """Handle cleanup."""
         self.idle_timer.idle = True
         super().cleanup()
+
+    async def async_stop_recording(self) -> None:
+        """Stop recording."""
+        self._recording_stopped.set()
 
     async def async_record(self) -> None:
         """Handle saving stream."""
@@ -203,7 +210,7 @@ class RecorderOutput(StreamOutput):
         if not self._segments:
             await self.recv()
         # Write segments as soon as they are completed
-        while not self.idle:
+        while not self.idle and not self._recording_stopped.is_set():
             await self.recv()
             await self._hass.async_add_executor_job(
                 write_segment, self._segments.popleft()
@@ -212,3 +219,4 @@ class RecorderOutput(StreamOutput):
         await self._hass.async_add_executor_job(
             finish_writing, self._segments, output, self.video_path
         )
+        self._recording_stopped.clear()

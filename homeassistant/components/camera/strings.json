@@ -110,6 +110,10 @@
           "description": "Planned lookback period to include in the recording (in addition to the duration). Only available if there is currently an active HLS stream. The actual length of the lookback period may vary."
         }
       }
+    },
+    "stop_recording": {
+      "name": "Stop Recording",
+      "description": "Stops any ongoing recordings of a live camera feed."
     }
   },
   "selector": {}

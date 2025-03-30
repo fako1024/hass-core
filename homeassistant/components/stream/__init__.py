@@ -588,6 +588,27 @@ class Stream:
 
         await recorder.async_record()
 
+    async def async_stop_recording(
+        self
+    ) -> None:
+        """Stop any active recording."""
+
+        # Keep import here so that we can import stream integration without installing reqs
+        # pylint: disable-next=import-outside-toplevel
+        from .recorder import RecorderOutput
+
+        # Add recorder
+        recorder = self.outputs().get(RECORDER_PROVIDER)
+
+        if not isinstance(recorder, RecorderOutput):
+            raise HomeAssistantError(
+                f"No active Stream to stop!"
+            )
+
+        await recorder.async_stop_recording()
+
+        self._logger.debug("Stopped all ongoing stream recordings")
+
     async def async_get_image(
         self,
         width: int | None = None,

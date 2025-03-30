@@ -20,6 +20,9 @@
     "record": {
       "service": "mdi:record-rec"
     },
+    "stop_recording": {
+      "service": "mdi:stop"
+    },
     "snapshot": {
       "service": "mdi:camera"
     },

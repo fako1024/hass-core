@@ -78,6 +78,7 @@ from .const import (
     PREF_ORIENTATION,
     PREF_PRELOAD_STREAM,
     SERVICE_RECORD,
+    SERVICE_STOP_RECORD,
     CameraState,
     StreamType,
 )
@@ -154,6 +155,9 @@ CAMERA_SERVICE_RECORD: VolDictType = {
     vol.Optional(CONF_LOOKBACK, default=0): vol.Coerce(int),
 }
 
+CAMERA_SERVICE_STOP_RECORD: VolDictType = {
+    vol.Required(ATTR_ENTITY_ID): cv.comp_entity_ids,
+}
 
 class CameraEntityDescription(EntityDescription, frozen_or_thawed=True):
     """A class that describes camera entities."""
@@ -404,6 +408,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     )
     component.async_register_entity_service(
         SERVICE_RECORD, CAMERA_SERVICE_RECORD, async_handle_record_service
+    )
+    component.async_register_entity_service(
+        SERVICE_STOP_RECORD, CAMERA_SERVICE_STOP_RECORD, async_handle_stop_recording_service
     )
 
     @callback
@@ -1257,6 +1264,15 @@ async def async_handle_record_service(
         duration=service_call.data[CONF_DURATION],
         lookback=service_call.data[CONF_LOOKBACK],
     )
+    return stream
+
+
+async def async_handle_stop_recording_service(
+    camera: Camera, _: ServiceCall
+) -> None:
+    """Handle stop recording service calls."""
+    if (stream := camera.stream):
+        await stream.async_stop_recording()
 
 
 # These can be removed if no deprecated constant are in this module anymore
