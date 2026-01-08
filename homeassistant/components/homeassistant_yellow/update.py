@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import logging
 
-import aiohttp
-
 from homeassistant.components.homeassistant_hardware.coordinator import (
     FirmwareUpdateCoordinator,
 )
@@ -18,23 +16,15 @@ from homeassistant.components.homeassistant_hardware.util import (
     FirmwareInfo,
 )
 from homeassistant.components.update import UpdateDeviceClass
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import (
-    DOMAIN,
-    FIRMWARE,
-    FIRMWARE_VERSION,
-    MANUFACTURER,
-    MODEL,
-    NABU_CASA_FIRMWARE_RELEASES_URL,
-    RADIO_DEVICE,
-)
+from . import HomeAssistantYellowConfigEntry
+from .config_flow import YellowFirmwareMixin
+from .const import DOMAIN, FIRMWARE, FIRMWARE_VERSION, MANUFACTURER, MODEL, RADIO_DEVICE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +34,7 @@ FIRMWARE_ENTITY_DESCRIPTIONS: dict[
 ] = {
     ApplicationType.EZSP: FirmwareUpdateEntityDescription(
         key="radio_firmware",
+        translation_key="radio_firmware",
         display_precision=0,
         device_class=UpdateDeviceClass.FIRMWARE,
         entity_category=EntityCategory.CONFIG,
@@ -55,6 +46,7 @@ FIRMWARE_ENTITY_DESCRIPTIONS: dict[
     ),
     ApplicationType.SPINEL: FirmwareUpdateEntityDescription(
         key="radio_firmware",
+        translation_key="radio_firmware",
         display_precision=0,
         device_class=UpdateDeviceClass.FIRMWARE,
         entity_category=EntityCategory.CONFIG,
@@ -65,7 +57,8 @@ FIRMWARE_ENTITY_DESCRIPTIONS: dict[
         firmware_name="OpenThread RCP",
     ),
     ApplicationType.CPC: FirmwareUpdateEntityDescription(
-        key="firmware",
+        key="radio_firmware",
+        translation_key="radio_firmware",
         display_precision=0,
         device_class=UpdateDeviceClass.FIRMWARE,
         entity_category=EntityCategory.CONFIG,
@@ -76,7 +69,8 @@ FIRMWARE_ENTITY_DESCRIPTIONS: dict[
         firmware_name="Multiprotocol",
     ),
     ApplicationType.GECKO_BOOTLOADER: FirmwareUpdateEntityDescription(
-        key="firmware",
+        key="radio_firmware",
+        translation_key="radio_firmware",
         display_precision=0,
         device_class=UpdateDeviceClass.FIRMWARE,
         entity_category=EntityCategory.CONFIG,
@@ -88,6 +82,7 @@ FIRMWARE_ENTITY_DESCRIPTIONS: dict[
     ),
     None: FirmwareUpdateEntityDescription(
         key="radio_firmware",
+        translation_key="radio_firmware",
         display_precision=0,
         device_class=UpdateDeviceClass.FIRMWARE,
         entity_category=EntityCategory.CONFIG,
@@ -102,8 +97,7 @@ FIRMWARE_ENTITY_DESCRIPTIONS: dict[
 
 def _async_create_update_entity(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
-    session: aiohttp.ClientSession,
+    config_entry: HomeAssistantYellowConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> FirmwareUpdateEntity:
     """Create an update entity that handles firmware type changes."""
@@ -122,11 +116,7 @@ def _async_create_update_entity(
     entity = FirmwareUpdateEntity(
         device=RADIO_DEVICE,
         config_entry=config_entry,
-        update_coordinator=FirmwareUpdateCoordinator(
-            hass,
-            session,
-            NABU_CASA_FIRMWARE_RELEASES_URL,
-        ),
+        update_coordinator=config_entry.runtime_data.coordinator,
         entity_description=entity_description,
     )
 
@@ -136,11 +126,7 @@ def _async_create_update_entity(
         """Replace the current entity when the firmware type changes."""
         er.async_get(hass).async_remove(entity.entity_id)
         async_add_entities(
-            [
-                _async_create_update_entity(
-                    hass, config_entry, session, async_add_entities
-                )
-            ]
+            [_async_create_update_entity(hass, config_entry, async_add_entities)]
         )
 
     entity.async_on_remove(
@@ -152,14 +138,11 @@ def _async_create_update_entity(
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: HomeAssistantYellowConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the firmware update config entry."""
-    session = async_get_clientsession(hass)
-    entity = _async_create_update_entity(
-        hass, config_entry, session, async_add_entities
-    )
+    entity = _async_create_update_entity(hass, config_entry, async_add_entities)
 
     async_add_entities([entity])
 
@@ -167,13 +150,13 @@ async def async_setup_entry(
 class FirmwareUpdateEntity(BaseFirmwareUpdateEntity):
     """Yellow firmware update entity."""
 
-    bootloader_reset_type = "yellow"  # Triggers a GPIO reset
-    _attr_has_entity_name = True
+    BOOTLOADER_RESET_METHODS = YellowFirmwareMixin.BOOTLOADER_RESET_METHODS
+    APPLICATION_PROBE_METHODS = YellowFirmwareMixin.APPLICATION_PROBE_METHODS
 
     def __init__(
         self,
         device: str,
-        config_entry: ConfigEntry,
+        config_entry: HomeAssistantYellowConfigEntry,
         update_coordinator: FirmwareUpdateCoordinator,
         entity_description: FirmwareUpdateEntityDescription,
     ) -> None:

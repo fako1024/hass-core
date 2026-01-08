@@ -15,9 +15,11 @@ from homeassistant.components.webhook import (
     Response,
     async_generate_url,
     async_register,
+    async_unregister,
 )
 from homeassistant.const import CONF_IP_ADDRESS, CONF_WEBHOOK_ID, Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import AUTO_SHUT_OFF_EVENT_NAME, DOMAIN
@@ -49,7 +51,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: WatergateConfigEntry) ->
     )
 
     watergate_client = WatergateLocalApiClient(
-        sonic_address if sonic_address.startswith("http") else f"http://{sonic_address}"
+        base_url=(
+            sonic_address
+            if sonic_address.startswith("http")
+            else f"http://{sonic_address}"
+        ),
+        session=async_get_clientsession(hass),
     )
 
     coordinator = WatergateDataCoordinator(hass, entry, watergate_client)
@@ -75,7 +82,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: WatergateConfigEntry) ->
 async def async_unload_entry(hass: HomeAssistant, entry: WatergateConfigEntry) -> bool:
     """Unload a config entry."""
     webhook_id = entry.data[CONF_WEBHOOK_ID]
-    hass.components.webhook.async_unregister(webhook_id)
+    async_unregister(hass, webhook_id)
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
